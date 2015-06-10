@@ -1,5 +1,6 @@
 import java.net._
-import java.io.{InputStreamReader, BufferedReader}
+import java.io.{File, FileNotFoundException, InputStreamReader, BufferedReader}
+import scala.io.Source
 import util.CoinWrangler
 
 import scala.collection.mutable.ListBuffer
@@ -24,7 +25,9 @@ object WebServer {
 
 class HTTPConnection(s: Socket) extends Thread {
 
-  val CONTENTTYPE = "ContentType"
+  val WEBROOT = "static"
+  val CONTENTTYPE = "Content-Type"
+  val CONTENTLENGTH = "Content-Length"
   val GET = "GET"
 
   start() // von Thread
@@ -42,16 +45,35 @@ class HTTPConnection(s: Socket) extends Thread {
         buf += line
       }
       val params:Map[String,String] = extractRequest(buf.toList)
-      val coins = params.getOrElse("coins", "10,5,2,1").split(",").toList.map(x => x.toInt)
-      val amount = params.getOrElse("amount", "10").toInt
-      val result = params.getOrElse("path", "coins") match {
-        case "coins" => calcCoinDenoms(coins, amount)
+      val path = params.getOrElse("path", "index.html")
+
+      if(path.contains(".")) {
+        val result = getFileContent(path)
+        s.getOutputStream.write(response(result.toString, "text/html").getBytes)
       }
-      val contenttype = params.getOrElse(CONTENTTYPE, "text/plain")
-      s.getOutputStream.write(response(result.toString).getBytes)
+      else if(path.contentEquals("coins")) {
+        val coins = params.getOrElse("coins", "10,5,2,1").split(",").toList.map(x => x.toInt)
+        val amount = params.getOrElse("amount", "100").toInt
+        val result = calcCoinDenoms(coins, amount)
+        s.getOutputStream.write(response(result.toString).getBytes)
+      }
+
+
     }
     finally {
       s.close()
+    }
+  }
+
+  def getFileContent(path:String):String = {
+    try {
+      val source = Source.fromFile(new File(".").getCanonicalPath + "/" + WEBROOT + "/" + path)
+      val content = try source.mkString finally source.close()
+      content
+    }
+    catch {
+      case fnfe: FileNotFoundException => s"$path does not exist"
+      case e: Exception => "Something went terribly wrong"
     }
   }
 
@@ -60,8 +82,11 @@ class HTTPConnection(s: Socket) extends Thread {
   }
 
   def response(html: String, c_type:String = "text/plain", code: String = "200 OK"): String = {
-    "HTTP/1.0 " + code + "\n" + CONTENTTYPE + ": " + c_type + "\n" +
-    "ContentLength: " + html.length + "\n" + html + "\n"
+    "HTTP/1.1 " + code + "\n" +
+    "Server: Scala Webserver\n" +
+    CONTENTTYPE + ": " + c_type + "\n" +
+    CONTENTLENGTH +": " + html.length + "\n\n" +
+    html + "\n"
   }
 
   def extractRequest(lines: List[String]):Map[String,String] = {
@@ -74,13 +99,16 @@ class HTTPConnection(s: Socket) extends Thread {
   def processLine(line:String):Map[String,String] = line match {
     case l if l startsWith "GET" => getParametersFromGET(l substring 4)
     case l if l startsWith CONTENTTYPE => Map(CONTENTTYPE -> l.substring(CONTENTTYPE.length + 2))
+    case _ => Map()
   }
 
   def getParametersFromGET(path:String):Map[String,String] = {
     if(path.charAt(0) == '/' && path.length > 1) {
-      val rest = path substring 1
+      val rest = try path.substring(1, path.indexOf(" ")) catch { case e: StringIndexOutOfBoundsException => path.substring(1)}
+      println(rest)
       if(rest contains "?") {
           val path = rest.substring(0, rest.indexOf("?"))
+          println(rest)
           val params:List[String] = rest.substring(rest.indexOf("?") + 1).split("&").toList
           val paramsToMap:Map[String,String] = params.map(param => param.split("=")(0) -> param.split("=")(1)).toMap
           paramsToMap + ("path" -> path)

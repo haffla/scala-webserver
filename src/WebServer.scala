@@ -1,4 +1,4 @@
-import java.net._
+import java.net.{ServerSocket,Socket}
 import java.io.{File, FileNotFoundException, InputStreamReader, BufferedReader}
 import scala.io.Source
 import util.CoinWrangler

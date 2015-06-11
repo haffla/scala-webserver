@@ -30,7 +30,7 @@ class HTTPConnection(s: Socket) extends Thread {
   val CONTENTLENGTH = "Content-Length"
   val GET = "GET"
 
-  start() // von Thread
+  start()
 
   override def run() {
     respond(s)
@@ -52,13 +52,16 @@ class HTTPConnection(s: Socket) extends Thread {
         s.getOutputStream.write(response(result.toString, "text/html").getBytes)
       }
       else if(path.contentEquals("coins")) {
-        val coins = params.getOrElse("coins", "10,5,2,1").split(",").toList.map(x => x.toInt)
+        val c = params.getOrElse("coins", "10,5,2,1")
+        val coins:List[Int] = c match {
+          case c if c.contains(",") => c.split(",").toList.map(x => x.toInt)
+          case c if c.contains("%2C") => c.split("%2C").toList.map(x => x.toInt)
+          case "euro" => List(500,200,100,50,20,10,5,2,1)
+        }
         val amount = params.getOrElse("amount", "100").toInt
         val result = calcCoinDenoms(coins, amount)
         s.getOutputStream.write(response(result.toString).getBytes)
       }
-
-
     }
     finally {
       s.close()
@@ -105,10 +108,8 @@ class HTTPConnection(s: Socket) extends Thread {
   def getParametersFromGET(path:String):Map[String,String] = {
     if(path.charAt(0) == '/' && path.length > 1) {
       val rest = try path.substring(1, path.indexOf(" ")) catch { case e: StringIndexOutOfBoundsException => path.substring(1)}
-      println(rest)
       if(rest contains "?") {
           val path = rest.substring(0, rest.indexOf("?"))
-          println(rest)
           val params:List[String] = rest.substring(rest.indexOf("?") + 1).split("&").toList
           val paramsToMap:Map[String,String] = params.map(param => param.split("=")(0) -> param.split("=")(1)).toMap
           paramsToMap + ("path" -> path)

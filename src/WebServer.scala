@@ -62,6 +62,9 @@ class HTTPConnection(s: Socket) extends Thread {
         val result = calcCoinDenoms(coins, amount)
         s.getOutputStream.write(response(result.toString).getBytes)
       }
+      else {
+        s.getOutputStream.write(response("HTTP ERROR 404: " + path + " does not exist on this server.", "text/plain", "404").getBytes)
+      }
     }
     finally {
       s.close()

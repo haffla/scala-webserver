@@ -35,7 +35,7 @@
               data: {amount: amount, coins: coins}
             }).done(function(data) {
               clearInterval(interval);
-              $("#result").html("Result: " + data);
+              $("#result").html(data);
             });
             event.preventDefault();
         });

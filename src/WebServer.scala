@@ -54,13 +54,16 @@ class HTTPConnection(s: Socket) extends Thread {
       else if(path.contentEquals("coins")) {
         val c = params.getOrElse("coins", "10,5,2,1")
         val coins:List[Int] = c match {
-          case c if c.contains(",") => c.split(",").toList.map(x => x.toInt)
-          case c if c.contains("%2C") => c.split("%2C").toList.map(x => x.toInt)
+          case `c` if c.contains(",") => c.split(",").toList.map(x => x.toInt)
+          case `c` if c.contains("%2C") => c.split("%2C").toList.map(x => x.toInt)
           case "euro" => List(500,200,100,50,20,10,5,2,1)
+          case `c` => try List(c.toInt) catch { case e: NumberFormatException => Nil}
+          case _ => Nil
         }
         val amount = params.getOrElse("amount", "100").toInt
         val result = calcCoinDenoms(coins, amount)
-        s.getOutputStream.write(response(result.toString).getBytes)
+        s.getOutputStream.write(response("There are " + result.toString + " different ways of returning " +
+                                          amount + " with the coins [" + c.replace("%2C", ", ") + "].").getBytes)
       }
       else {
         s.getOutputStream.write(response("HTTP ERROR 404: " + path + " does not exist on this server.", "text/plain", "404").getBytes)
@@ -105,7 +108,7 @@ class HTTPConnection(s: Socket) extends Thread {
   def processLine(line:String):Map[String,String] = line match {
     case l if l startsWith "GET" => getParametersFromGET(l substring 4)
     case l if l startsWith CONTENTTYPE => Map(CONTENTTYPE -> l.substring(CONTENTTYPE.length + 2))
-    case _ => Map()
+    case _ => Map.empty
   }
 
   def getParametersFromGET(path:String):Map[String,String] = {
@@ -122,6 +125,6 @@ class HTTPConnection(s: Socket) extends Thread {
         Map("path" -> rest)
       }
     }
-    else Map()
+    else Map.empty
   }
 }
